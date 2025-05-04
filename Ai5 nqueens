@@ -1,0 +1,40 @@
+print("Enter the number of queens: ")
+N = int(input())
+
+# Initialize the chessboard as an N x N matrix filled with 0
+board = [[0] * N for _ in range(N)]
+
+def is_attack(i, j):
+    # Check for queen in the same row or column
+    for k in range(0, N):
+        if board[i][k] == 1 or board[k][j] == 1:
+            return True
+    # Check for queen in diagonals (all cells where the difference in rows equals difference in columns)
+    for r in range(0, N):
+        for c in range(0, N):
+            if board[r][c] == 1 and abs(r - i) == abs(c - j):
+                return True
+    return False
+
+def N_queen(n):
+    # Base case: if n==0 then all queens have been placed
+    if n == 0:
+        return True
+    # Try every cell on the board
+    for i in range(0, N):
+        for j in range(0, N):
+            # If no queen attacks this cell and there is no queen already placed here
+            if board[i][j] != 1 and not is_attack(i, j):
+                board[i][j] = 1
+                # Recursion: place the remaining queens
+                if N_queen(n - 1):
+                    return True
+                # Backtrack: remove the queen and try another cell
+                board[i][j] = 0
+    return False
+
+if N_queen(N):
+    for row in board:
+        print(row)
+else:
+    print("No solution exists.")
