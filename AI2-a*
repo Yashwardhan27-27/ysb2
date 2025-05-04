@@ -1,0 +1,180 @@
+from collections import deque
+
+class Graph:
+    def __init__(self, adjacency_list):
+        self.adjacency_list = adjacency_list
+
+    def get_neighbors(self, v):
+        return self.adjacency_list[v]
+
+    def h(self, n):
+        H = {
+            'A': 3,
+            'B': 4,
+            'C': 2,
+            'D': 6,
+            'G': 0,
+            'S': 5
+        }
+        return H[n]
+
+    def a_star_algorithm(self, start_node, stop_node):
+        open_list = set([start_node])
+        closed_list = set([])
+        g = {}
+        g[start_node] = 0
+        parents = {}
+        parents[start_node] = start_node
+
+        while len(open_list) > 0:
+            n = None
+            for v in open_list:
+                if n is None or g[v] + self.h(v) < g[n] + self.h(n):
+                    n = v
+
+            if n is None:
+                print('Path does not exist!')
+                return None
+
+            if n == stop_node:
+                reconst_path = []
+                while parents[n] != n:
+                    reconst_path.append(n)
+                    n = parents[n]
+                reconst_path.append(start_node)
+                reconst_path.reverse()
+                print('Path found:', reconst_path)
+                return reconst_path
+
+            for (m, weight) in self.get_neighbors(n):
+                if m not in open_list and m not in closed_list:
+                    open_list.add(m)
+                    parents[m] = n
+                    g[m] = g[n] + weight
+                else:
+                    if g.get(m, float('inf')) > g[n] + weight:
+                        g[m] = g[n] + weight
+                        parents[m] = n
+                        if m in closed_list:
+                            closed_list.remove(m)
+                            open_list.add(m)
+
+            open_list.remove(n)
+            closed_list.add(n)
+
+        print('Path does not exist!')
+        return None
+
+adjacency_list = {
+    'A': [('B', 2), ('C', 1)],
+    'B': [('D', 5)],
+    'C': [('D', 3), ('G', 4)],
+    'D': [('G', 2)],
+    'S': [('A', 1), ('G', 10)]
+}
+
+graph1 = Graph(adjacency_list)
+graph1.a_star_algorithm('S', 'G')
+
+
+
+# 8 Puzzle Solver – Improved with Manhattan Distance Heuristic
+
+from copy import deepcopy
+import numpy as np
+import time
+
+def manhattan_distance(puzzle, goal):
+    """Calculate the Manhattan distance between puzzle state and goal state.
+       The puzzle and goal are lists of length 9 (0 represents the blank)."""
+    md = 0
+    for i, tile in enumerate(puzzle):
+        if tile != 0:
+            cur_row, cur_col = divmod(i, 3)
+            goal_index = goal.index(tile)
+            goal_row, goal_col = divmod(goal_index, 3)
+            md += abs(cur_row - goal_row) + abs(cur_col - goal_col)
+    return md
+
+def bestsolution(state):
+    bestsol = np.array([], int).reshape(-1, 9)
+    count = len(state) - 1
+    while count != -1:
+        bestsol = np.insert(bestsol, 0, state[count]['puzzle'], 0)
+        count = state[count]['parent']
+    return bestsol.reshape(-1, 3, 3)
+
+# (The old misplaced_tiles and coordinates functions have been replaced by Manhattan distance.)
+
+def evaluvate_misplaced(puzzle, goal):
+    # Correct moves: up subtracts 3, down adds 3, left subtracts 1, right adds 1.
+    steps = np.array([
+        ('up',    [0, 1, 2],   -3),  # cannot move up if blank is in top row
+        ('down',  [6, 7, 8],    3),  # cannot move down if blank is in bottom row
+        ('left',  [0, 3, 6],   -1),  # cannot move left if blank is in left column
+        ('right', [2, 5, 8],    1)   # cannot move right if blank is in right column
+    ], dtype=[('move', 'U10'), ('position', list), ('head', int)])
+    
+    dtstate = [('puzzle', list), ('parent', int), ('gn', int), ('hn', int)]
+    hn = manhattan_distance(puzzle, goal)
+    gne = 0
+
+    state = np.array([(puzzle, -1, gne, hn)], dtype=dtstate)
+    
+    dtpriority = [('position', int), ('fn', int)]
+    priority = np.array([(0, hn)], dtype=dtpriority)
+    
+    while True:
+        if len(priority) == 0:
+            print("The 8 puzzle is unsolvable")
+            return state, 0
+
+        priority = np.sort(priority, order=['fn', 'position'])
+        position, fn = priority[0]
+        priority = np.delete(priority, 0, axis=0)
+        
+        puzzle, parent, gn, hn = state[position]
+        puzzle = np.array(puzzle)
+        blank = int(np.where(puzzle == 0)[0][0])
+        
+        start_time = time.time()
+        
+        for s in steps:
+            if blank not in s['position']:
+                openstates = deepcopy(puzzle)
+                head = blank + s['head']
+                if 0 <= head < 9:  # move must be within puzzle bounds
+                    openstates[blank], openstates[head] = openstates[head], openstates[blank]
+                    
+                    if not any(np.array_equal(openstates, item['puzzle']) for item in state):
+                        end_time = time.time()
+                        if (end_time - start_time) > 2:
+                            print("The 8 puzzle is unsolvable")
+                            return state, len(priority)
+                        
+                        hn = manhattan_distance(openstates, goal)
+                        q = np.array([(list(openstates), position, gn + 1, hn)], dtype=dtstate)
+                        state = np.append(state, q)
+                        
+                        fn = gn + 1 + hn
+                        q = np.array([(len(state) - 1, fn)], dtype=dtpriority)
+                        priority = np.append(priority, q)
+                        
+                        if np.array_equal(openstates, goal):
+                            print("The 8 puzzle is solvable")
+                            return state, len(priority)
+        
+    return state, len(priority)
+
+# Initialize the puzzle and goal state
+puzzle = [2, 8, 3, 1, 6, 4, 7, 0, 5]
+goal   = [1, 2, 3, 8, 0, 4, 7, 6, 5]
+
+# Solve the puzzle
+state, visited = evaluvate_misplaced(puzzle, goal)
+bestpath = bestsolution(state)
+print(str(bestpath).replace('[', '').replace(']', ''))
+
+totalmoves = len(bestpath) - 1
+print('\nSteps to reach goal:', totalmoves)
+print('Total nodes visited:', len(state), "\n")
